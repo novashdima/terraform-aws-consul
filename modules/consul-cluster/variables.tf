@@ -315,3 +315,15 @@ variable "protect_from_scale_in" {
   type        = bool
   default     = false
 }
+
+variable "launch_template_version" {
+  description = "Launch template version.  Can be version number, $Latest, or $Default."
+  type        = string
+  default     = "$Latest"
+}
+
+variable "update_default_version" {
+  description = "Whether to update Default Version each update. Conflicts with default_version."
+  type        = bool
+  default     = true
+}
