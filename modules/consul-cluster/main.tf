@@ -95,6 +95,10 @@ resource "aws_launch_template" "launch_template" {
   ebs_optimized          = var.root_volume_ebs_optimized
   update_default_version = var.update_default_version
 
+  monitoring {
+    enabled = true
+  }
+
   iam_instance_profile {
     name = var.enable_iam_setup ? element(
       concat(aws_iam_instance_profile.instance_profile.*.name, [""]),
