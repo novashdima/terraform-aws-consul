@@ -39,21 +39,26 @@ resource "aws_autoscaling_group" "autoscaling_group" {
 
   protect_from_scale_in = var.protect_from_scale_in
 
-  tags = flatten(
-    [
-      {
-        key                 = "Name"
-        value               = var.cluster_name
-        propagate_at_launch = true
-      },
-      {
-        key                 = var.cluster_tag_key
-        value               = var.cluster_tag_value
-        propagate_at_launch = true
-      },
-      var.tags,
-    ]
-  )
+  tag {
+    key                 = "Name"
+    value               = var.cluster_name
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = var.cluster_tag_key
+    value               = var.cluster_tag_value
+    propagate_at_launch = true
+  }
+
+  dynamic "tag" {
+    for_each = var.tags
+    content {
+      key                 = tag.value.key
+      value               = tag.value.value
+      propagate_at_launch = tag.value.propagate_at_launch
+    }
+  }
 
   dynamic "initial_lifecycle_hook" {
     for_each = var.lifecycle_hooks
@@ -112,7 +117,7 @@ resource "aws_launch_template" "launch_template" {
 
   network_interfaces {
     associate_public_ip_address = var.associate_public_ip_address
-    security_groups             = concat(
+    security_groups = concat(
       [aws_security_group.lc_security_group.id],
       var.additional_security_group_ids,
     )
@@ -284,4 +289,3 @@ module "iam_policies" {
   enabled     = var.enable_iam_setup
   iam_role_id = element(concat(aws_iam_role.instance_role.*.id, [""]), 0)
 }
-
