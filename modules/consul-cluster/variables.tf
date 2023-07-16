@@ -318,5 +318,5 @@ variable "protect_from_scale_in" {
 
 variable "consul_lb_tg_arn" {
   description = "ALB target group ARN value provisioned for Consul"
-  type        = "string"
+  type        = string
 }
