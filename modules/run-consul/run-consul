@@ -327,9 +327,11 @@ EOF
   "server": $server,
   $gossip_encryption_configuration
   $rpc_encryption_configuration
-  $autopilot_configuration
   "ui_config": {
     "enabled": $ui_config_enabled
+  },
+  "connect": {
+    "enabled": "true",
   }
 }
 EOF
