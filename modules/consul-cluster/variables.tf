@@ -316,11 +316,6 @@ variable "protect_from_scale_in" {
   default     = false
 }
 
-variable "consul_lb_tg_arn" {
-  description = "ALB target group ARN value provisioned for Consul"
-  type        = list(string)
-}
-
 variable "launch_template_version" {
   description = "Launch template version.  Can be version number, $Latest, or $Default."
   type        = string
