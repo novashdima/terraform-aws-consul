@@ -16,7 +16,10 @@ terraform {
 resource "aws_autoscaling_group" "autoscaling_group" {
   name_prefix = var.cluster_name
 
-  launch_configuration = aws_launch_configuration.launch_configuration.name
+  launch_template {
+    id      = aws_launch_template.launch_template.id
+    version = var.launch_template_version
+  }
 
   availability_zones  = var.availability_zones
   vpc_zone_identifier = var.subnet_ids
@@ -38,21 +41,26 @@ resource "aws_autoscaling_group" "autoscaling_group" {
 
   protect_from_scale_in = var.protect_from_scale_in
 
-  tags = flatten(
-    [
-      {
-        key                 = "Name"
-        value               = var.cluster_name
-        propagate_at_launch = true
-      },
-      {
-        key                 = var.cluster_tag_key
-        value               = var.cluster_tag_value
-        propagate_at_launch = true
-      },
-      var.tags,
-    ]
-  )
+  tag {
+    key                 = "Name"
+    value               = var.cluster_name
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = var.cluster_tag_key
+    value               = var.cluster_tag_value
+    propagate_at_launch = true
+  }
+
+  dynamic "tag" {
+    for_each = var.tags
+    content {
+      key                 = tag.value.key
+      value               = tag.value.value
+      propagate_at_launch = tag.value.propagate_at_launch
+    }
+  }
 
   dynamic "initial_lifecycle_hook" {
     for_each = var.lifecycle_hooks
@@ -85,33 +93,52 @@ resource "aws_autoscaling_group" "autoscaling_group" {
 # CREATE LAUNCH CONFIGURATION TO DEFINE WHAT RUNS ON EACH INSTANCE IN THE ASG
 # ---------------------------------------------------------------------------------------------------------------------
 
-resource "aws_launch_configuration" "launch_configuration" {
-  name_prefix   = "${var.cluster_name}-"
-  image_id      = var.ami_id
-  instance_type = var.instance_type
-  user_data     = var.user_data
-  spot_price    = var.spot_price
+resource "aws_launch_template" "launch_template" {
+  name_prefix            = "${var.cluster_name}-"
+  image_id               = var.ami_id
+  instance_type          = var.instance_type
+  user_data              = var.user_data
+  key_name               = var.ssh_key_name
+  ebs_optimized          = var.root_volume_ebs_optimized
+  update_default_version = var.update_default_version
 
-  iam_instance_profile = var.enable_iam_setup ? element(
-    concat(aws_iam_instance_profile.instance_profile.*.name, [""]),
-    0,
-  ) : var.iam_instance_profile_name
-  key_name = var.ssh_key_name
+  monitoring {
+    enabled = true
+  }
 
-  security_groups = concat(
-    [aws_security_group.lc_security_group.id],
-    var.additional_security_group_ids,
-  )
-  placement_tenancy           = var.tenancy
-  associate_public_ip_address = var.associate_public_ip_address
+  iam_instance_profile {
+    name = var.enable_iam_setup ? element(
+      concat(aws_iam_instance_profile.instance_profile.*.name, [""]),
+      0,
+    ) : var.iam_instance_profile_name
+  }
 
-  ebs_optimized = var.root_volume_ebs_optimized
+  placement {
+    tenancy = var.tenancy
+  }
 
-  root_block_device {
-    volume_type           = var.root_volume_type
-    volume_size           = var.root_volume_size
-    delete_on_termination = var.root_volume_delete_on_termination
-    encrypted             = var.root_volume_encrypted
+  network_interfaces {
+    associate_public_ip_address = var.associate_public_ip_address
+    security_groups = concat(
+      [aws_security_group.lc_security_group.id],
+      var.additional_security_group_ids,
+    )
+  }
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+    ebs {
+      delete_on_termination = var.root_volume_delete_on_termination
+      encrypted             = true
+      volume_type           = var.root_volume_type
+      volume_size           = var.root_volume_size
+    }
+  }
+
+  instance_market_options {
+    spot_options {
+      max_price = var.spot_price
+    }
   }
 
   # Important note: whenever using a launch configuration with an auto scaling group, you must set
@@ -264,4 +291,3 @@ module "iam_policies" {
   enabled     = var.enable_iam_setup
   iam_role_id = element(concat(aws_iam_role.instance_role.*.id, [""]), 0)
 }
-
